@@ -61,14 +61,17 @@ class Cracker(object):
 
 def test():
 	gen = LCG(123)
-	# states = [1103527590, 377401575, 662824084, 1147902781, 2035015474, 368800899, 1508029952, 486256185, 1062517886, 267834847]
-	states = []
-	for i in range(10):
-	    states.append(next(gen))
+	# states = [1804289383, 846930886, 1681692777, 1714636915, 1957747793, 424238335, 719885386, 1649760492, 596516649, 1189641421]
+
+	states = [1103527590, 377401575, 662824084, 1147902781, 2035015474, 368800899, 1508029952, 486256185, 1062517886, 267834847]
+	# for i in range(10):
+	    # states.append(next(gen))
 	print(states)
 	cracker = Cracker(states)
-	cracker.predict_next(*cracker.crack_lcg())
-	print(next(gen))
+	a,b,c = cracker.crack_lcg()
+	print(a,b,c)
+	cracker.predict_next(a,b,c)
+	# print(next(gen))
 
 
 
