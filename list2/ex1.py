@@ -10,6 +10,8 @@ class RC4(object):
 		self.key_length = len(key)
 		self.S = self.KSA()
 		self.D = D
+		self.i = 0
+		self.j = 0
 
 	def KSA(self):
 		s = [i for i in range(self.N)]
@@ -20,12 +22,11 @@ class RC4(object):
 		return s
 
 	def PRGA(self):
-		i = j = 0
 		while True:
-			i = (i + 1) % self.N
-			j = (j + self.S[i]) % self.N
-			self.S[i], self.S[j] = self.S[j], self.S[i]
-			Z = self.S[(self.S[i] + self.S[j]) % self.N]
+			self.i = (self.i + 1) % self.N
+			self.j = (self.j + self.S[self.i]) % self.N
+			self.S[self.i], self.S[self.j] = self.S[self.j], self.S[self.i]
+			Z = self.S[(self.S[self.i] + self.S[self.j]) % self.N]
 			yield Z
 
 	def __iter__(self):
@@ -58,8 +59,13 @@ def main():
 	key = generate_key(arguments.key_length)
 	drop = arguments.drop
 	rc4 = RC4(key, N, T, drop)
-	for _ in range(arguments.number):
-		print(next(rc4))
+	file_name = f`test_{N}_{T}_{arguments.key_length}_{drop}.bin`
+	with open(file_name, 'wb') as file:
+		frame = bytearray()
+		for _ in range(arguments.number):
+			test = next(rc4)
+			frame.append(test)
+		file.write(frame)
 
 if __name__ == '__main__':
 	main()
