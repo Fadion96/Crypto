@@ -46,26 +46,38 @@ def parse_arg():
 	parser.add_argument("--N", dest='N', type=int, default=16)
 	parser.add_argument("--key-length", dest='key_length', type=int, default=40)
 	parser.add_argument("--drop", dest='drop', type=int, default=0)
-	parser.add_argument("--number", dest='number', type=int, default=10)
+	parser.add_argument("--number", dest='number', type=int, default=100000000)
 
 	return parser.parse_args()
 
 
 
 def main():
-	arguments = parse_arg()
-	N = arguments.N
-	T = N if not arguments.log else int(2 * N * math.log(N))
-	key = generate_key(arguments.key_length)
-	drop = arguments.drop
-	rc4 = RC4(key, N, T, drop)
-	file_name = f`test_{N}_{T}_{arguments.key_length}_{drop}.bin`
-	with open(file_name, 'wb') as file:
-		frame = bytearray()
-		for _ in range(arguments.number):
-			test = next(rc4)
-			frame.append(test)
-		file.write(frame)
+	# arguments = parse_arg()
+	N_values = [16, 64, 256]
+	K_lengths = [40, 64, 128]
+	drop_values = [0, 1, 2, 3]
+	# N = arguments.N
+	# T = N if not arguments.log else int(2 * N * math.log(N))
+	# key = generate_key(arguments.key_length)
+	# drop = arguments.drop
+	# rc4 = RC4(key, N, T, drop)
+	# file_name = f'test_{N}_{T}_{arguments.key_length}_{drop}.bin'
+	for N in N_values:
+		for log in [0,1]:
+			for k_len in K_lengths:
+				for drop in drop_values:
+					T = N if not log else int(2 * N * math.log(N))
+					key = generate_key(k_len)
+					rc4 = RC4(key, N, T, drop)
+					file_name = f'test_{N}_{T}_{k_len}_{drop}.bin'
+					print("Doing", file_name)
+					with open(file_name, 'wb') as file:
+						frame = bytearray()
+						for _ in range(10000000):
+							test = next(rc4)
+							frame.append(test)
+						file.write(frame)
 
 if __name__ == '__main__':
 	main()
