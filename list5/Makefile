@@ -1,9 +1,12 @@
 .PHONY: clean
 
-all: clean field
+all: clean ex1 ex2
 
-field:
+ex1:
 		g++ ex1.cpp -o ex1 -std=c++17 -lgmpxx -lgmp
 
+ex2:
+		g++ ex2.cpp -o ex2 -std=c++17 -lgmpxx -lgmp
+
 clean:
-		rm -f *.o ex1
+		rm -f *.o ex1 ex2
