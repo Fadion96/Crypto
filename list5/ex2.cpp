@@ -1,131 +1,109 @@
 #include <iostream>
 #include "field.cpp"
+#include <tuple>
+#include <cassert>
 #include <fstream>
 
 using namespace std;
 
 mpz_t modulo;
-mpz_class d;
-mpz_class I;
+mpz_class d = -376014;
 typedef Field<modulo> Number;
+typedef pair<Number,Number> Point;
 
-pair<Number,Number> edwardsAdd(const pair<Number,Number> firstPoint, const pair<Number,Number> secondPoint) {
-    Number x1 = firstPoint.first;
-    Number y1 = firstPoint.second;
-    Number x2 = secondPoint.first;
-    Number y2 = secondPoint.second;
+Point edwardsAdd(const Point firstPoint, const Point secondPoint) {
+    auto [x1, y1] = firstPoint;
+    auto [x2, y2] = secondPoint;
     Number x = (x1 * y2 + x2 * y1) / (Number(1) + Number(d) * x1 * x2 * y1 * y2);
     Number y = (y1 * y2 - x1 * x2) / ( Number(1) - Number(d) * x1 * x2 * y1 * y2);
     return make_pair(x,y);
 }
 
-pair<Number, Number> scalarMulti(mpz_class scalar, pair<Number,Number> P){
-    if (scalar == 0){
+Point scalarMulti(mpz_class scalar, Point P) {
+    if (scalar == 0) {
         return make_pair(Number(0),Number(1));
     }
-    if (scalar == 1){
+    if (scalar == 1) {
         return P;
     }
-    pair<Number, Number> Q = scalarMulti(scalar / 2, P);
+    Point Q = scalarMulti(scalar / 2, P);
     Q = edwardsAdd(Q,Q);
-    if ((scalar & 1) == 1){
+    if ((scalar & 1) == 1) {
         Q = edwardsAdd(P,Q);
     }
     return Q;
 }
 
-bool isOnCurve(pair<Number, Number> point) {
-    Number x = point.first;
-    Number y = point.second;
-    Number test = x * x + y*y - Number(1) - Number(d)*x*x*y*y;
-    if (test == Number(0)){
+bool isOnCurve(Point point) {
+    auto [x, y] = point;
+    Number test = x * x + y * y - Number(1) - Number(d) * x * x * y * y;
+    if (test == Number(0)) {
         return true;
     }
     return false;
 }
 
-void printPoint(pair<Number, Number> point){
+void printPoint(Point point) {
     cout << point.first.getValue() << " " << point.second.getValue() << endl;
 }
 
-Number xRecover(Number y) {
-    Number xx = (y * y - Number(1)) / (Number(d) * y * y - Number(1));
-    mpz_class x_tmp = xx.getValue();
-    mpz_class exp_x(modulo);
-    exp_x = (exp_x + 3) / 8;
-    mpz_class test;
-    mpz_powm(test.get_mpz_t(),x_tmp.get_mpz_t(),exp_x.get_mpz_t(), modulo);
-    Number x(test);
-    if ((x * x - xx) != Number(0)){
-        x = x * Number(I);
-    }
-    if ((x % Number(2)) != 0) {
-        x = Number(modulo) - x;
-    }
-    return x;
+
+void setupModulo() {
+    mpz_ui_pow_ui(modulo, 2, 521);
+    mpz_sub_ui(modulo, modulo, 1);
 }
 
-void setupModulo(){
-    mpz_ui_pow_ui(modulo,2,255);
-    mpz_sub_ui(modulo,modulo,19);
-}
-void setupDValue(){
-    d = -121665;
-    mpz_class tmp_2 = 121666;
-    mpz_invert(tmp_2.get_mpz_t(),tmp_2.get_mpz_t(),modulo);
-    d *= tmp_2;
-}
-
-void setupIValue(){
-    mpz_class tmp_i = 2;
-    mpz_class exp_i(modulo);
-    exp_i = (exp_i - 1) / 4;
-    mpz_powm(I.get_mpz_t(),tmp_i.get_mpz_t(),exp_i.get_mpz_t(), modulo);
-}
-
-pair<Number, Number> createGenerator() {
-    Number by = Number(4) / Number(5);
-    Number bx = xRecover(by);
-    return make_pair(bx, by);
-}
-
-
-int main(int argc, char const *argv[]) {
-    setupModulo();
-    setupDValue();
-    setupIValue();
-    pair<Number, Number> P = createGenerator();
-
-    gmp_randclass r(gmp_randinit_default);
+unsigned long long int getSeed() {
     unsigned long long int seed = 0;
     ifstream urandom("/dev/urandom", ios::in|ios::binary);
     urandom.read(reinterpret_cast<char*>(&seed), sizeof(seed));
-    r.seed(seed);
+    return seed;
+}
 
-    mpz_class a = r.get_z_range(mpz_class(modulo)); // Private key a (integer)
-    pair<Number, Number> R = scalarMulti(a, P); // Public key R (a * P), point on EC
-    // ---------------------------------- ENC -------------------------
-    mpz_class k = r.get_z_range(mpz_class(modulo));
-    pair<Number, Number> Q = scalarMulti(k, P);
-    pair<Number, Number> kR = scalarMulti(k,R);
-    mpz_class message;
-    Number x_message;
-    pair <Number, Number> p_message;
-    do {
-        message = r.get_z_range(mpz_class(modulo));
-        x_message = xRecover(Number(message));
-        p_message = make_pair(x_message, message);
-    }
-    while(!isOnCurve(p_message));
+Point createGenerator() {
+    Number y = Number(12);
+    mpz_class xn;
+    xn = "15710548941849953875359397498943175686452973504 \
+    02905821437625181152304994381188529632591196067604100772673927915114267193389905003276673749012051148356041324";
+    Number x = Number(xn);
+    return make_pair(x, y);
+}
+
+tuple<mpz_class, Point> generateKeys(gmp_randclass& rand, Point generator) {
+    mpz_class a = rand.get_z_range(mpz_class(modulo)); // Private key a (integer)
+    Point A = scalarMulti(a, generator); // Public key R (a * P), point on EC
+    return make_tuple(a, A);
+}
+
+tuple<Point, Point> encrypt(Point message, Point generator, Point pubKey, gmp_randclass& rand) {
+    mpz_class k = rand.get_z_range(mpz_class(modulo));
+    Point Q = scalarMulti(k, generator);
+    Point kR = scalarMulti(k, pubKey);
+    Point crypto = edwardsAdd(message, kR);
+    return make_tuple(Q, crypto);
+}
+
+Point decrypt(Point Q, Point crypto, mpz_class privKey) {
+    Point aQ = scalarMulti(privKey, Q);
+    Point minus_aQ = make_pair(-aQ.first, aQ.second);
+    return edwardsAdd(minus_aQ, crypto);
+}
+
+int main(int argc, char const *argv[]) {
+    setupModulo();
+    gmp_randclass r(gmp_randinit_default);
+    r.seed(getSeed());
+    Point generator = createGenerator();
+    auto [privKey, pubKey] = generateKeys(r, generator);
+    mpz_class scalarMessage = r.get_z_range(mpz_class(modulo));
+    Point pointMessage = scalarMulti(scalarMessage, generator);
     cout << "MESSAGE" << endl;
-    printPoint(p_message);
-    pair<Number, Number> crypto = edwardsAdd(p_message, kR);
-    cout << "CRYPTO" << endl;
+    printPoint(pointMessage);
+    auto [Q, crypto] = encrypt(pointMessage, generator, pubKey, r);
+    cout << endl << "CRYPTO" << endl;
     printPoint(crypto);
-    // ---------------------------------- DEC-------------------------
-    pair<Number, Number> aQ = scalarMulti(a, Q);
-    pair<Number, Number> dec_aQ = make_pair(-aQ.first,aQ.second);
-    pair <Number, Number> dec_m = edwardsAdd(dec_aQ, crypto);
-    printPoint(dec_m);
-
+    Point decMessage = decrypt(Q, crypto, privKey);
+    cout << endl << "DECRYPT" << endl;
+    printPoint(decMessage);
+    assert(pointMessage.first == decMessage.first && pointMessage.second == decMessage.second);
 }
