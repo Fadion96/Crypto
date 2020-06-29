@@ -54,9 +54,9 @@ void setupModulo() {
 }
 
 unsigned long long int getSeed() {
-    unsigned long long int seed = 0;
-    ifstream urandom("/dev/urandom", ios::in|ios::binary);
-    urandom.read(reinterpret_cast<char*>(&seed), sizeof(seed));
+    unsigned long long int seed;
+    ifstream random("/dev/random", ios::in|ios::binary);
+    random.read(reinterpret_cast<char*>(&seed), sizeof(seed));
     return seed;
 }
 
@@ -77,15 +77,15 @@ tuple<mpz_class, Point> generateKeys(gmp_randclass& rand, Point generator) {
 
 tuple<Point, Point> encrypt(Point message, Point generator, Point pubKey, gmp_randclass& rand) {
     mpz_class k = rand.get_z_range(mpz_class(modulo));
-    Point Q = scalarMulti(k, generator);
-    Point kR = scalarMulti(k, pubKey);
-    Point crypto = edwardsAdd(message, kR);
+    Point Q = scalarMulti(k, generator); // Q = (k * p), point on EC
+    Point kR = scalarMulti(k, pubKey);	// k * R = (k(aP)), point on EC
+    Point crypto = edwardsAdd(message, kR); // crypto = M + kR
     return make_tuple(Q, crypto);
 }
 
 Point decrypt(Point Q, Point crypto, mpz_class privKey) {
-    Point aQ = scalarMulti(privKey, Q);
-    Point minus_aQ = make_pair(-aQ.first, aQ.second);
+    Point aQ = scalarMulti(privKey, Q); // a * Q = (a(kP)), point on EC
+    Point minus_aQ = make_pair(-aQ.first, aQ.second); // M = crypto + (-aQ) (-aQ = {-x,y})
     return edwardsAdd(minus_aQ, crypto);
 }
 
